@@ -17,7 +17,7 @@ BODY = {
 }
 
 # Lista di test: numero di utenti simultanei
-CONCURRENT_USERS_LIST = [1, 10, 20, 22, 24, 26, 28, 30, 32, 35, 40, 50]
+CONCURRENT_USERS_LIST = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 
 def send_request(user_index, num_users):
