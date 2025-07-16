@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 
 # Cartella dove sono salvati i file CSV
-csv_folder = "./bpic12Ram"
+#csv_folder = "./bpic12Ram"
+csv_folder = "./sepsisRam"
 
 # Trova tutti i file CSV nella cartella
 csv_files = [f for f in os.listdir(csv_folder) if f.endswith(".csv")]
@@ -54,5 +55,6 @@ plt.title("Average RAM Usage vs Number of Users")
 plt.grid(True, alpha=0.3)
 plt.xticks(sorted_x)
 plt.tight_layout()
-plt.savefig(os.path.join(csv_folder, "bpic12Ram_scalability.png"), dpi=300, bbox_inches='tight')
+#plt.savefig(os.path.join(csv_folder, "bpic12Ram_scalability.png"), dpi=300, bbox_inches='tight')
+plt.savefig(os.path.join(csv_folder, "sepsisRam_scalability.png"), dpi=300, bbox_inches='tight')
 plt.show()

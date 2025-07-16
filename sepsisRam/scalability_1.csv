@@ -1,0 +1,7 @@
+<<<<<<< HEAD:sepsisRam/scalability_1.csv
+num_users,user_id,start_time,end_time,status,details,ram_avg_bytes
+1,1,1752697537.0080934,1752697537.577007,SUCCESS,200,8737328.29
+=======
+num_users,user_id,start_time,end_time,status,details,ram_avg_bytes
+1,1,1752698480.2922692,1752698482.787115,SUCCESS,200,48390439.13
+>>>>>>> 005b3134d473fa922ab2c8b8a63b4793537bde3b:scalability_1.csv
