@@ -3,18 +3,35 @@ import os
 import matplotlib.pyplot as plt
 from collections import defaultdict
 
+#name= "sepsisRam"
+#name= "bpic13Ram"
+name= "bpic12Ram"
+
 # Cartella dove sono salvati i file CSV
-#csv_folder = "./bpic12Ram"
-csv_folder = "./sepsisRam"
+csv_folder = "./" + name
 
 # Trova tutti i file CSV nella cartella
-csv_files = [f for f in os.listdir(csv_folder) if f.endswith(".csv")]
+#csv_files = [f for f in os.listdir(csv_folder) if f.endswith(".csv")]
+csv_files = [
+    #"scalability_1.csv",
+    "scalability_10.csv",
+    "scalability_20.csv",
+    "scalability_30.csv",
+    "scalability_40.csv",
+    "scalability_50.csv",
+    "scalability_60.csv",
+    "scalability_70.csv",
+    "scalability_80.csv",
+    "scalability_90.csv",
+    "scalability_100.csv",
+]
 
 # Dizionari per memorizzare dati
 ram_per_num_users = defaultdict(list)
 
 for filename in csv_files:
     filepath = os.path.join(csv_folder, filename)
+
     with open(filepath, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
@@ -22,7 +39,8 @@ for filename in csv_files:
                 num_users = int(row["num_users"])
                 ram_avg = row.get("ram_avg_bytes", "").strip()
                 if ram_avg:
-                    ram_avg = float(ram_avg)
+                    #ram_avg = float(ram_avg)
+                    ram_avg = float(ram_avg) / 1024
                     ram_per_num_users[num_users].append(ram_avg)
             except Exception as e:
                 print(f"Errore nella riga {row}: {e}")
@@ -50,11 +68,10 @@ for num_users in sorted_x:
 plt.figure(figsize=(10, 6))
 plt.plot(sorted_x, sorted_y_ram, marker='s', color='green', linewidth=2, markersize=8)
 plt.xlabel("Number of concurrent users")
-plt.ylabel("Average RAM usage (bytes)")
-plt.title("Average RAM Usage vs Number of Users")
+plt.ylabel("Average RAM usage (KB)")
+#plt.title("Average RAM Usage vs Number of Users")
 plt.grid(True, alpha=0.3)
 plt.xticks(sorted_x)
 plt.tight_layout()
-#plt.savefig(os.path.join(csv_folder, "bpic12Ram_scalability.png"), dpi=300, bbox_inches='tight')
-plt.savefig(os.path.join(csv_folder, "sepsisRam_scalability.png"), dpi=300, bbox_inches='tight')
+plt.savefig(os.path.join(csv_folder, name+"_scalability.png"), dpi=300, bbox_inches='tight')
 plt.show()
