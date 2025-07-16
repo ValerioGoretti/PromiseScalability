@@ -17,7 +17,7 @@ BODY = {
 }
 
 # Lista di test: numero di utenti simultanei
-CONCURRENT_USERS_LIST = [1, 5, 10, 15, 20, 25]
+CONCURRENT_USERS_LIST = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 # Funzione per inviare una richiesta e misurare i timestamp
 def send_request(user_index, num_users):
