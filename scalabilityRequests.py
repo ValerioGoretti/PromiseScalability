@@ -3,8 +3,10 @@ import time
 import concurrent.futures
 import csv
 import os
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
-# URL del server Go locale (eseguito sulla stessa macchina)
+# URL del server Go locale
 URL = "http://127.0.0.1:8080/process"
 
 # Corpo della richiesta
@@ -17,35 +19,143 @@ BODY = {
 }
 
 # Lista di test: numero di utenti simultanei
-CONCURRENT_USERS_LIST = [100]
+CONCURRENT_USERS_LIST = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
-# Funzione per inviare una richiesta e misurare i timestamp
+
+def create_session():
+    """Crea una sessione HTTP ottimizzata"""
+    session = requests.Session()
+
+    # Configurazione retry
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+    )
+
+    # Adapter con configurazioni ottimizzate
+    adapter = HTTPAdapter(
+        max_retries=retry_strategy,
+        pool_connections=20,
+        pool_maxsize=20,
+        pool_block=True
+    )
+
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+
+    return session
+
+
 def send_request(user_index, num_users):
+    """Invia una richiesta e misura i timestamp"""
     start_time = time.time()
+    session = create_session()
+
     try:
-        response = requests.post(URL, json=BODY, timeout=300)
+        response = session.post(
+            URL,
+            json=BODY,
+            timeout=(30, 600),  # (connection_timeout, read_timeout)
+            headers={'Connection': 'close'}  # Evita keep-alive
+        )
         end_time = time.time()
-        return (num_users, user_index, start_time, end_time)
+
+        if response.status_code == 200:
+            return (num_users, user_index, start_time, end_time, "SUCCESS", response.status_code)
+        else:
+            return (num_users, user_index, start_time, end_time, "HTTP_ERROR", response.status_code)
+
+    except requests.exceptions.Timeout:
+        end_time = time.time()
+        return (num_users, user_index, start_time, end_time, "TIMEOUT", None)
+    except requests.exceptions.ConnectionError as e:
+        end_time = time.time()
+        return (num_users, user_index, start_time, end_time, "CONNECTION_ERROR", str(e))
     except Exception as e:
-        print(f"Errore nella richiesta dell'utente {user_index}: {e}")
-        return (num_users, user_index, start_time, None)
+        end_time = time.time()
+        return (num_users, user_index, start_time, end_time, "OTHER_ERROR", str(e))
+    finally:
+        session.close()
+
+
+def wait_for_server_ready():
+    """Attende che il server sia pronto"""
+    max_attempts = 10
+    for attempt in range(max_attempts):
+        try:
+            response = requests.get("http://127.0.0.1:8080/monitoring", timeout=5)
+            if response.status_code == 200:
+                print("[INFO] Server è pronto")
+                return True
+        except:
+            pass
+
+        print(f"[INFO] Tentativo {attempt + 1}/{max_attempts} - Server non ancora pronto...")
+        time.sleep(2)
+
+    print("[WARNING] Server potrebbe non essere pronto")
+    return False
+
 
 # Esecuzione test
+print("[INFO] Verifica disponibilità server...")
+wait_for_server_ready()
+
 for num_users in CONCURRENT_USERS_LIST:
     output_file = f"scalability_{num_users}.csv"
     print(f"\n[INFO] Simulazione con {num_users} utenti simultanei. Salvataggio in: {output_file}")
 
-    # Pausa di 5 secondi tra i test
-    time.sleep(5)
+    # Pausa più lunga tra i test per permettere al server di recuperare
+    print(f"[INFO] Pausa di 10 secondi prima del test...")
+    time.sleep(10)
 
-    # Esegue tutte le richieste concorrenti
-    with concurrent.futures.ThreadPoolExecutor(max_workers=num_users) as executor:
+    start_test_time = time.time()
+
+    # Esegue tutte le richieste concorrenti con un numero massimo di worker
+    max_workers = min(num_users, 100)  # Limita il numero di thread
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(send_request, i + 1, num_users) for i in range(num_users)]
-        results = [f.result() for f in concurrent.futures.as_completed(futures)]
+        results = []
 
-    # Scrive i risultati nel file CSV corrispondente
+        # Raccogli i risultati man mano che arrivano
+        for future in concurrent.futures.as_completed(futures, timeout=700):
+            try:
+                result = future.result()
+                results.append(result)
+
+                # Feedback in tempo reale
+                if result[4] == "SUCCESS":
+                    print(f"[OK] Utente {result[1]} completato in {result[3] - result[2]:.2f}s")
+                else:
+                    print(f"[ERROR] Utente {result[1]} fallito: {result[4]}")
+
+            except concurrent.futures.TimeoutError:
+                print(f"[TIMEOUT] Alcuni utenti non hanno completato entro il timeout")
+                break
+            except Exception as e:
+                print(f"[ERROR] Errore nel recupero risultato: {e}")
+
+    end_test_time = time.time()
+
+    # Statistiche del test
+    successful_requests = sum(1 for r in results if r[4] == "SUCCESS")
+    failed_requests = len(results) - successful_requests
+    total_time = end_test_time - start_test_time
+
+    print(f"[STATS] Test completato in {total_time:.2f}s")
+    print(f"[STATS] Richieste riuscite: {successful_requests}/{num_users}")
+    print(f"[STATS] Richieste fallite: {failed_requests}/{num_users}")
+    print(f"[STATS] Tasso di successo: {(successful_requests / num_users) * 100:.1f}%")
+
+    # Scrive i risultati nel file CSV
     with open(output_file, mode='w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(["num_users", "user_id", "start_time", "end_time"])
+        writer.writerow(["num_users", "user_id", "start_time", "end_time", "status", "details"])
         for result in results:
             writer.writerow(result)
+
+    print(f"[INFO] Risultati salvati in {output_file}")
+
+print("\n[INFO] Test di scalabilità completato!")
