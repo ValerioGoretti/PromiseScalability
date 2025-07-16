@@ -17,7 +17,7 @@ BODY = {
 }
 
 # Lista di test: numero di utenti simultanei
-CONCURRENT_USERS_LIST = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+CONCURRENT_USERS_LIST = [1, 2, 3]#10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
 
 
 def send_request(user_index, num_users):
@@ -34,9 +34,18 @@ def send_request(user_index, num_users):
         end_time = time.time()
 
         if response.status_code == 200:
-            return (num_users, user_index, start_time, end_time, "SUCCESS", response.status_code)
+            try:
+                ram_avg = response.json().get("ram_avg_bytes", None)
+            except Exception:
+                ram_avg = None
+            return (num_users, user_index, start_time, end_time, "SUCCESS", response.status_code, ram_avg)
+
         else:
-            return (num_users, user_index, start_time, end_time, "HTTP_ERROR", response.status_code)
+            try:
+                ram_avg = response.json().get("ram_avg_bytes", None)
+            except Exception:
+                ram_avg = None
+            return (num_users, user_index, start_time, end_time, "SUCCESS", response.status_code, ram_avg)
 
     except requests.exceptions.Timeout:
         end_time = time.time()
@@ -145,7 +154,7 @@ for num_users in CONCURRENT_USERS_LIST:
     # Scrive i risultati nel file CSV
     with open(output_file, mode='w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(["num_users", "user_id", "start_time", "end_time", "status", "details"])
+        writer.writerow(["num_users", "user_id", "start_time", "end_time", "status", "details", "ram_avg_bytes"])
         for result in results:
             writer.writerow(result)
 
