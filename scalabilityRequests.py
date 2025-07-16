@@ -3,8 +3,6 @@ import time
 import concurrent.futures
 import csv
 import os
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
 
 # URL del server Go locale
 URL = "http://127.0.0.1:8080/process"
@@ -19,41 +17,15 @@ BODY = {
 }
 
 # Lista di test: numero di utenti simultanei
-CONCURRENT_USERS_LIST = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-
-
-def create_session():
-    """Crea una sessione HTTP ottimizzata"""
-    session = requests.Session()
-
-    # Configurazione retry
-    retry_strategy = Retry(
-        total=3,
-        backoff_factor=1,
-        status_forcelist=[429, 500, 502, 503, 504],
-    )
-
-    # Adapter con configurazioni ottimizzate
-    adapter = HTTPAdapter(
-        max_retries=retry_strategy,
-        pool_connections=20,
-        pool_maxsize=20,
-        pool_block=True
-    )
-
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
-
-    return session
+CONCURRENT_USERS_LIST = [1, 10, 20, 22, 24, 26, 28, 30, 32, 35, 40, 50]
 
 
 def send_request(user_index, num_users):
     """Invia una richiesta e misura i timestamp"""
     start_time = time.time()
-    session = create_session()
 
     try:
-        response = session.post(
+        response = requests.post(
             URL,
             json=BODY,
             timeout=(30, 600),  # (connection_timeout, read_timeout)
@@ -75,8 +47,6 @@ def send_request(user_index, num_users):
     except Exception as e:
         end_time = time.time()
         return (num_users, user_index, start_time, end_time, "OTHER_ERROR", str(e))
-    finally:
-        session.close()
 
 
 def wait_for_server_ready():
@@ -98,6 +68,25 @@ def wait_for_server_ready():
     return False
 
 
+def trigger_garbage_collection():
+    """Forza garbage collection sul server"""
+    try:
+        response = requests.post("http://127.0.0.1:8080/gc", timeout=10)
+        if response.status_code == 200:
+            gc_info = response.json()
+            print(f"[GC] Memory before: {gc_info['memory_before_mb']} MB")
+            print(f"[GC] Memory after: {gc_info['memory_after_mb']} MB")
+            print(f"[GC] Freed: {gc_info['freed_mb']} MB")
+            print(f"[GC] Total GC runs: {gc_info['total_gc_runs']}")
+            return True
+        else:
+            print(f"[GC] Errore HTTP: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"[GC] Errore: {e}")
+        return False
+
+
 # Esecuzione test
 print("[INFO] Verifica disponibilità server...")
 wait_for_server_ready()
@@ -105,6 +94,10 @@ wait_for_server_ready()
 for num_users in CONCURRENT_USERS_LIST:
     output_file = f"scalability_{num_users}.csv"
     print(f"\n[INFO] Simulazione con {num_users} utenti simultanei. Salvataggio in: {output_file}")
+
+    # Forza garbage collection prima del test
+    print(f"[INFO] Triggering garbage collection...")
+    trigger_garbage_collection()
 
     # Pausa più lunga tra i test per permettere al server di recuperare
     print(f"[INFO] Pausa di 10 secondi prima del test...")
